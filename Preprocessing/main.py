@@ -33,115 +33,31 @@ from my_code.utils import read_eeg_data, read_meg_data
 
 # %%
 project_path = os.getcwd()
-sets_type = ['EEG','MEG']
+sets_type = ['EEG','OPM-MEG']
 
 raws = dict()
 for set_type in sets_type:
-    set_data_path = op.join(project_path,'data',set_type)
+    set_data_path = op.join(project_path,'Raw data')
     subject_list = os.listdir(set_data_path)
     for subject in subject_list:
         if set_type == 'EEG':
-            subject_data_name = subject + '_' + set_type + '.cdt'
-            subject_trigger_name = subject + '_' + set_type + '.txt'
-            sensor_name = '64-channels.loc'
-        elif set_type == 'MEG':
-            subject_data_name = subject + '_' + set_type + '.basedata'
-            subject_trigger_name = subject + '_' + set_type + '.txt'
-            sensor_name = 'sensors_mecg64.mat'
-        subject_data_path = op.join(set_data_path,subject,subject_data_name)
-        trigger_path = op.join(set_data_path,subject,subject_trigger_name)
-        sensor_path = op.join(project_path,'support_files',sensor_name)
+            subject_data_name = subject + '_eeg-raw.fif'
+            subject_trigger_name = subject + '_eeg_event.txt'
+        elif set_type == 'OPM-MEG':
+            subject_data_name = subject + '_opmmeg-raw.fif'
+            subject_events_name = subject + '_opmmeg_event.txt'
+        subject_data_path = op.join(set_data_path,subject,set_type,subject_data_name)
+        events_path = op.join(set_data_path,subject,set_type,subject_events_name)
 
         if subject not in raws.keys():
             raws[subject] = dict()
 
-        if set_type == 'EEG':
-            raw, events = read_eeg_data(subject_data_path,trigger_path,sensor_path)
-        elif set_type == 'MEG':
-            raw, events = read_meg_data(subject_data_path,trigger_path,sensor_path)
-
+        raw = mne.io.read_raw_fif(subject_data_path,preload=True)
+        event = mne.read_events(events_path)
+        
         raws[subject][set_type + '_raw'] = raw
         raws[subject][set_type + '_events'] = events
 
-# %%
-raw_meg = raws['xch']['EEG_raw']
-events_meg = raws['xch']['EEG_events']
-raw_meg.plot(events=events_meg,event_color='r')
-plt.show()
-
-# %%
-from my_code.utils import plot_eeg_sensors, plot_meg_sensors
-
-trans = mne.transforms.Transform('head', 'mri')
-subjects_dir = "D:\科研\MRI"
-subject = 'wangfulong1'
-
-raw = raws['wfl']['MEG_raw']
-info = raw.info
-
-fig = plot_meg_sensors(info,subject,subjects_dir,trans)
-screenshot_meg = fig.plotter.screenshot(scale=10)
-
-raw = raws['wfl']['EEG_raw']
-info = raw.info
-trans = mne.read_trans(r'.\support_files\trans_eeg.fif')
-
-fig = plot_eeg_sensors(info,subject,subjects_dir,trans)
-screenshot_eeg = fig.plotter.screenshot(scale=10)
-
-
-# %%
-from my_code.utils import plot_sensors2d
-plt.rcParams['font.family'] = 'Times New Roman,SimSun'
-plt.rcParams['font.size'] = 12
-plt.rcParams['font.weight'] = 'bold'
-fig,axes = plt.subplots(1,2,figsize=(7, 4),constrained_layout=True)
-fig.patch.set_facecolor((1, 1, 1, 0))
-text_args = {'color':'k','fontsize':10,'fontweight':'bold'}
-scatter_args = {'c':'k','s':11,'alpha':1,'marker':'o'}
-
-info = raws['wfl']['MEG_raw'].info
-plot_sensors2d(info,sphere=0.11,show_names=True,axes=axes[0],text_args=text_args,scatter_args=scatter_args)
-axes[0].set_facecolor((1, 1, 1, 0))
-
-info = raws['wfl']['EEG_raw'].info
-plot_sensors2d(info,show_names=True,axes=axes[1],text_args=text_args,scatter_args=scatter_args)
-plt.show()
-
-# fig.savefig('sensor.svg',transparent=True)
-
-# %%
-plt.rcParams['font.family'] = 'Times New Roman,SimSun'
-plt.rcParams['font.size'] = 12
-plt.rcParams['font.weight'] = 'bold'
-fig,axes = plt.subplots(1,2,figsize=(7, 4),constrained_layout=True)
-fig.patch.set_facecolor((1, 1, 1, 0))
-
-axes[0].axis('off')
-cax0 = fig.add_axes([0.025,0,0.48,0.98])
-nonwhite_pix = (screenshot_meg != 255).any(-1)
-nonwhite_row = nonwhite_pix.any(1)
-nonwhite_col = nonwhite_pix.any(0)
-cropped_screenshot_meg = screenshot_meg[nonwhite_row][:, nonwhite_col]
-cax0.imshow(cropped_screenshot_meg, cmap='gray')
-cax0.axis('off')
-axes[0].set_facecolor((1, 1, 1, 0))
-cax0.set_facecolor((1, 1, 1, 0))
-
-axes[1].axis('off')
-cax1 = fig.add_axes([0.52,0,0.48,0.9])
-nonwhite_pix = (screenshot_eeg != 255).any(-1)
-nonwhite_row = nonwhite_pix.any(1)
-nonwhite_col = nonwhite_pix.any(0)
-cropped_screenshot_eeg = screenshot_eeg[nonwhite_row][:, nonwhite_col]
-cax1.imshow(cropped_screenshot_eeg, cmap='gray')
-cax1.axis('off')
-axes[1].set_facecolor((1, 1, 1, 0))
-cax1.set_facecolor((1, 1, 1, 0))
-
-plt.show()
-
-# fig.savefig('brain.png',dpi=600,transparent=True)
 
 # %%
 event_dict = {'9Hz':173,'10Hz':178,'11Hz':183,
@@ -206,22 +122,6 @@ for subject in raws.keys():
         dftbandwidth = [2,2,2]
         dftneighbourwidth = [2,2,2]
         raw_interpolation = spectrum_interpolation(raw_hfc.copy(),Fl, dftbandwidth, dftneighbourwidth)
-
-        # 2. MEG SSP
-        # raw_meg_ssp = raw_meg_filter.copy()
-        # empty_room_projs = mne.compute_proj_raw(raw_room_filter,n_mag=5)
-        # raw_meg_ssp.add_proj(empty_room_projs).apply_proj(verbose="error")
-
-        # # 3. 频谱插值
-        # from wfl_preproc_spectrum_interpolation import spectrum_interpolation
-        # # Fl = [44,46] # 8楼数据
-        # Fl = [31,63]
-        # dftbandwidth = [2,2]
-        # dftneighbourwidth = [2,2]
-        # raw_interpolation = spectrum_interpolation(raw_hfc.copy(),Fl, dftbandwidth, dftneighbourwidth)
-
-        # 4. 坏道插值
-        # raw_interpolation = raw_interpolation.copy().interpolate_bads()
 
         # 5. Epochs
         epochs_meg = mne.Epochs(raw_interpolation,events_meg,event_dict,tmin=-0.5,tmax=5.5,
