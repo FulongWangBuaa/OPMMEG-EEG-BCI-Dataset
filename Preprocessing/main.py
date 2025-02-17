@@ -26,10 +26,6 @@ from mne.viz.backends.renderer import _get_renderer
 from mne.transforms import apply_trans,_get_trans,_get_transforms_to_coord_frame,_frame_to_str
 from mne.io.pick import _picks_to_idx
 
-# My
-import sys
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-from my_code.utils import read_eeg_data, read_meg_data
 
 # %%
 project_path = os.getcwd()
